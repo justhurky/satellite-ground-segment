@@ -1,0 +1,112 @@
+spring:
+  application:
+    name: satellite-ground-segment
+  datasource:
+    url: jdbc:h2:mem:groundsegment;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
+    username: ground_segment
+    password: ground_segment
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP_UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: true
+
+server:
+  port: 8080
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+logging:
+  level:
+    io.github.justhurky.groundsegment: INFO
+
+ground-segment:
+  jwt:
+    secret: ${GROUND_SEGMENT_JWT_SECRET}
+    access-token-ttl: PT30M
+    issuer: satellite-ground-segment
+  crypto:
+    data-encryption-key: ${GROUND_SEGMENT_DATA_ENCRYPTION_KEY}
+  telemetry:
+    replay-window-size: 64
+    max-frame-bytes: 4096
+    acknowledgement-apid: 2047
+  uplink:
+    max-commands-per-pass: 20
+    max-clock-skew: PT5M
+    dispatch-interval: 5s
+  commands:
+    catalogue:
+      ping:
+        criticality: ROUTINE
+        allowed-phases: [COMMISSIONING, NOMINAL, SAFE_MODE]
+        required-role: OPERATOR
+        payload-bytes: 16
+      request-housekeeping:
+        criticality: ROUTINE
+        allowed-phases: [COMMISSIONING, NOMINAL, SAFE_MODE]
+        required-role: OPERATOR
+        payload-bytes: 24
+      set-payload-mode:
+        criticality: SENSITIVE
+        allowed-phases: [NOMINAL]
+        required-role: OPERATOR
+        payload-bytes: 32
+      reaction-wheel-bias:
+        criticality: SENSITIVE
+        allowed-phases: [COMMISSIONING, NOMINAL]
+        required-role: OPERATOR
+        payload-bytes: 48
+      enter-safe-mode:
+        criticality: SENSITIVE
+        allowed-phases: [COMMISSIONING, NOMINAL]
+        required-role: OPERATOR
+        payload-bytes: 16
+      exit-safe-mode:
+        criticality: CRITICAL
+        allowed-phases: [SAFE_MODE]
+        required-role: FLIGHT_DIRECTOR
+        payload-bytes: 16
+      thruster-burn:
+        criticality: CRITICAL
+        allowed-phases: [NOMINAL]
+        required-role: FLIGHT_DIRECTOR
+        payload-bytes: 64
+      software-patch-upload:
+        criticality: CRITICAL
+        allowed-phases: [NOMINAL, SAFE_MODE]
+        required-role: FLIGHT_DIRECTOR
+        payload-bytes: 1024
