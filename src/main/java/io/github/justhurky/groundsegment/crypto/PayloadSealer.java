@@ -44,10 +44,10 @@ public class PayloadSealer {
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(TAG_LENGTH_BITS, nonce));
             cipher.updateAAD(associatedData.getBytes(StandardCharsets.UTF_8));
-            byte[] ciphertext = cipher.doFinal(plaintext);
-            byte[] sealed = new byte[nonce.length + ciphertext.length];
-            System.arraycopy(nonce, 0, sealed, 0, nonce.length);
-            System.arraycopy(ciphertext, 0, sealed, nonce.length, ciphertext.length);
+            byte[] sealed = new byte[Math.addExact(NONCE_LENGTH_BYTES,
+                    cipher.getOutputSize(plaintext.length))];
+            System.arraycopy(nonce, 0, sealed, 0, NONCE_LENGTH_BYTES);
+            cipher.doFinal(plaintext, 0, plaintext.length, sealed, NONCE_LENGTH_BYTES);
             return sealed;
         } catch (GeneralSecurityException e) {
             throw new KeyMaterialException("Unable to seal a payload with " + TRANSFORMATION, e);
