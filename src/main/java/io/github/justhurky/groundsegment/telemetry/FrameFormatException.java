@@ -1,0 +1,11 @@
+package io.github.justhurky.groundsegment.telemetry;
+
+import io.github.justhurky.groundsegment.common.error.ErrorCode;
+import io.github.justhurky.groundsegment.common.error.GroundSegmentException;
+
+public class FrameFormatException extends GroundSegmentException {
+
+    public FrameFormatException(String message) {
+        super(ErrorCode.FRAME_MALFORMED, message);
+    }
+}
