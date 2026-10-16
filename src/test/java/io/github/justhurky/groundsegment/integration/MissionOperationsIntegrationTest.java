@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.justhurky.groundsegment.command.CommandCanonicaliser;
 import io.github.justhurky.groundsegment.command.CommandCriticality;
 import io.github.justhurky.groundsegment.command.UplinkPassService;
+import io.github.justhurky.groundsegment.command.dto.CancelCommandRequest;
 import io.github.justhurky.groundsegment.command.dto.SubmitCommandRequest;
 import io.github.justhurky.groundsegment.common.util.Codecs;
 import io.github.justhurky.groundsegment.crypto.Ed25519Keys;
@@ -287,6 +288,112 @@ class MissionOperationsIntegrationTest {
         client.postJson("/api/v1/spacecraft/" + mission.spacecraftId() + "/contact-windows", analystToken,
                 new ScheduleContactWindowRequest(mission.stationCode(), Instant.now(),
                         Instant.now().plus(Duration.ofHours(1)), 1024), 403);
+    }
+
+    @Test
+    void exposesTheOperationalReadEndpoints() throws Exception {
+        Mission mission = commissionedMission();
+        String adminToken = client.login("admin", PASSWORD);
+        String analystToken = client.login("analyst", PASSWORD);
+
+        assertThat(client.getJson("/api/v1/auth/me", analystToken, 200).get("username").asText())
+                .isEqualTo("analyst");
+        assertThat(client.getJson("/api/v1/users", adminToken, 200).size()).isEqualTo(6);
+        assertThat(client.getJson("/api/v1/users", analystToken, 403)).isNotNull();
+
+        assertThat(client.getJson("/api/v1/spacecraft", analystToken, 200).size()).isPositive();
+        assertThat(client.getJson("/api/v1/spacecraft/" + mission.spacecraftId(), analystToken, 200)
+                .get("allowedPhaseTargets").size()).isEqualTo(3);
+        assertThat(client.getJson("/api/v1/spacecraft/" + mission.spacecraftId() + "/parameters",
+                analystToken, 200).size()).isEqualTo(2);
+
+        assertThat(client.getJson("/api/v1/ground-stations", analystToken, 200).size()).isPositive();
+        assertThat(client.getJson("/api/v1/spacecraft/" + mission.spacecraftId() + "/contact-windows",
+                analystToken, 200).get(0).get("groundStationCode").asText()).isEqualTo(mission.stationCode());
+
+        assertThat(client.getJson("/api/v1/commands/catalogue", analystToken, 200).toString())
+                .contains("PING", "THRUSTER_BURN");
+    }
+
+    @Test
+    void reportsAnUnknownSpacecraftAsNotFound() throws Exception {
+        String analystToken = client.login("analyst", PASSWORD);
+
+        JsonNode problem = client.getJson("/api/v1/spacecraft/" + UUID.randomUUID(), analystToken, 404);
+
+        assertThat(problem.get("errorCode").asText()).isEqualTo("RESOURCE_NOT_FOUND");
+    }
+
+    @Test
+    void listsAlertsAndCommandsForASpacecraft() throws Exception {
+        Mission mission = commissionedMission();
+        String stationToken = client.login("station", PASSWORD);
+        String operatorToken = client.login("operator", PASSWORD);
+
+        client.postJson("/api/v1/telemetry/frames", stationToken,
+                ingestRequest(mission, TELEMETRY_APID, 1, Instant.now().truncatedTo(ChronoUnit.MILLIS),
+                        TestFrames.samplePayload(Map.of(1, 20.0))), 201);
+        client.postJson("/api/v1/spacecraft/" + mission.spacecraftId() + "/commands", operatorToken,
+                signedCommand(mission, "ping", CommandCriticality.ROUTINE), 201);
+
+        JsonNode alerts = client.getJson("/api/v1/spacecraft/" + mission.spacecraftId()
+                + "/alerts?severity=RED&acknowledged=false", operatorToken, 200);
+        assertThat(alerts.get("totalElements").asLong()).isEqualTo(1);
+
+        JsonNode commands = client.getJson("/api/v1/spacecraft/" + mission.spacecraftId()
+                + "/commands?state=VALIDATED", operatorToken, 200);
+        assertThat(commands.get("totalElements").asLong()).isEqualTo(1);
+        assertThat(commands.get("content").get(0).get("opcode").asText()).isEqualTo("PING");
+    }
+
+    @Test
+    void cancelsAValidatedCommandAndRefusesToCancelItTwice() throws Exception {
+        Mission mission = commissionedMission();
+        String operatorToken = client.login("operator", PASSWORD);
+        JsonNode submitted = client.postJson("/api/v1/spacecraft/" + mission.spacecraftId() + "/commands",
+                operatorToken, signedCommand(mission, "ping", CommandCriticality.ROUTINE), 201);
+        String commandId = submitted.get("id").asText();
+
+        JsonNode cancelled = client.postJson("/api/v1/commands/" + commandId + "/cancel", operatorToken,
+                new CancelCommandRequest("superseded by a later plan"), 200);
+        assertThat(cancelled.get("state").asText()).isEqualTo("CANCELLED");
+        assertThat(cancelled.get("outcomeDetail").asText()).isEqualTo("superseded by a later plan");
+
+        JsonNode problem = client.postJson("/api/v1/commands/" + commandId + "/cancel", operatorToken,
+                new CancelCommandRequest("again"), 409);
+        assertThat(problem.get("errorCode").asText()).isEqualTo("ILLEGAL_STATE_TRANSITION");
+    }
+
+    @Test
+    void acceptsAnAcknowledgementFrameForACommandItCannotMatch() throws Exception {
+        Mission mission = commissionedMission();
+        String stationToken = client.login("station", PASSWORD);
+        byte[] payload = new CommandAcknowledgement(UUID.randomUUID(), true,
+                CommandAcknowledgement.RESULT_CODE_EXECUTED).encode();
+
+        JsonNode response = client.postJson("/api/v1/telemetry/frames", stationToken,
+                ingestRequest(mission, ACKNOWLEDGEMENT_APID, 1,
+                        Instant.now().truncatedTo(ChronoUnit.MILLIS), payload), 201);
+
+        assertThat(response.get("frameId").asLong()).isPositive();
+        assertThat(response.get("sampleCount").asInt()).isZero();
+    }
+
+    @Test
+    void ignoresAnAcknowledgementForACommandThatWasNeverUplinked() throws Exception {
+        Mission mission = commissionedMission();
+        String stationToken = client.login("station", PASSWORD);
+        String operatorToken = client.login("operator", PASSWORD);
+        JsonNode submitted = client.postJson("/api/v1/spacecraft/" + mission.spacecraftId() + "/commands",
+                operatorToken, signedCommand(mission, "ping", CommandCriticality.ROUTINE), 201);
+        UUID commandId = UUID.fromString(submitted.get("id").asText());
+
+        client.postJson("/api/v1/telemetry/frames", stationToken,
+                ingestRequest(mission, ACKNOWLEDGEMENT_APID, 1, Instant.now().truncatedTo(ChronoUnit.MILLIS),
+                        new CommandAcknowledgement(commandId, true, 0).encode()), 201);
+
+        assertThat(client.getJson("/api/v1/commands/" + commandId, operatorToken, 200)
+                .get("state").asText()).isEqualTo("VALIDATED");
     }
 
     @Test
