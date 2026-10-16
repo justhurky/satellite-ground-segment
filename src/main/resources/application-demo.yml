@@ -1,0 +1,14 @@
+ground-segment:
+  jwt:
+    secret: demo-profile-signing-key-not-for-production-0001
+    access-token-ttl: PT8H
+  crypto:
+    data-encryption-key: 5wwTGlnv/8J0FwEGgViotGHCMy1/uLscwsQQcT5CmEA=
+  demo:
+    password: demo-operator-password
+    command-public-key-base64: MCowBQYDK2VwAyEAq9yKLzi9u54mWW4M8KRupwVJlhPkwbZuOBXDDZVhmSc=
+    command-private-key-base64: MC4CAQAwBQYDK2VwBCIEINGeR8HngNG/2k1mb8JYBTZI/9pIu5BPPMqQ1DSiUGj7
+
+logging:
+  level:
+    io.github.justhurky.groundsegment: DEBUG
