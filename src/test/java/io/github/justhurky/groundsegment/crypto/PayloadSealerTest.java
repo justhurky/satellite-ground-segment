@@ -65,6 +65,15 @@ class PayloadSealerTest {
     }
 
     @Test
+    void refusesToSealMoreThanTheConfiguredMaximum() {
+        byte[] oversized = new byte[PayloadSealer.MAX_PLAINTEXT_BYTES + 1];
+
+        assertThatThrownBy(() -> sealer.seal(oversized, CONTEXT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("the limit is");
+    }
+
+    @Test
     void rejectsAKeyOfTheWrongLength() {
         assertThatThrownBy(() -> new PayloadSealer(properties("c2hvcnQta2V5")))
                 .isInstanceOf(IllegalStateException.class)

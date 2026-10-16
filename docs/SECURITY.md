@@ -15,6 +15,8 @@
 | A command issued in a mission phase that cannot survive it   | Per-opcode mission-phase allowlist in configuration           |
 | Silent tampering with the operational history                | Append-only audit log with a SHA-256 hash chain and a verification endpoint |
 | A stolen token used indefinitely                            | Short-lived stateless JWTs with issuer and expiry validation   |
+| Forged log lines injected through a request path or message  | Control characters replaced and values truncated before they reach the log |
+| An oversized payload forcing a large allocation              | The sealer refuses anything above its plaintext limit before allocating    |
 | Secrets committed to the repository                          | No production defaults; start-up fails without the required environment variables |
 
 ## Frame authentication
@@ -107,6 +109,18 @@ under concurrency.
 The `demo` profile contains development keys and prints the generated telemetry key to the log so
 that the walkthrough is reproducible. Those keys are public by design and must never be used
 anywhere else; the profile exists for demonstration only.
+
+## Static analysis
+
+CodeQL runs the extended security query set on every push and once a week. Two findings were real
+and are fixed: request paths and exception messages are passed through `LogSanitiser` before they
+reach the log, so a newline in a URL cannot forge a log line, and `PayloadSealer` rejects a plaintext
+above its limit before allocating the buffer that holds it.
+
+One finding is deliberately not acted on. CodeQL reports the disabled CSRF protection in the security
+filter chain. CSRF is an attack on ambient credentials, and this API has none: it is stateless, it
+authenticates every request with a bearer token that a browser never attaches on its own, and it
+issues no session cookie. Enabling CSRF tokens here would add a ceremony that protects nothing.
 
 ## What is deliberately out of scope
 

@@ -1,5 +1,6 @@
 package io.github.justhurky.groundsegment.common.error;
 
+import io.github.justhurky.groundsegment.common.util.LogSanitiser;
 import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.time.Clock;
@@ -34,10 +35,10 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(GroundSegmentException.class)
     public ProblemDetail onGroundSegmentException(GroundSegmentException exception, WebRequest request) {
         if (exception.errorCode().status().is5xxServerError()) {
-            log.error("Unhandled domain failure on {}", path(request), exception);
+            log.error("Unhandled domain failure on {}", loggedPath(request), exception);
         } else {
-            log.warn("Rejected request on {}: {} {}", path(request), exception.errorCode(),
-                    exception.getMessage());
+            log.warn("Rejected request on {}: {} {}", loggedPath(request), exception.errorCode(),
+                    LogSanitiser.oneLine(exception.getMessage()));
         }
         return problem(exception.errorCode(), exception.getMessage(), request);
     }
@@ -54,19 +55,21 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(AuthenticationException.class)
     public ProblemDetail onAuthenticationFailure(AuthenticationException exception, WebRequest request) {
-        log.warn("Authentication failed on {}: {}", path(request), exception.getMessage());
+        log.warn("Authentication failed on {}: {}", loggedPath(request),
+                LogSanitiser.oneLine(exception.getMessage()));
         return problem(ErrorCode.AUTHENTICATION_FAILED, "Authentication failed", request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail onAccessDenied(AccessDeniedException exception, WebRequest request) {
-        log.warn("Access denied on {}: {}", path(request), exception.getMessage());
+        log.warn("Access denied on {}: {}", loggedPath(request),
+                LogSanitiser.oneLine(exception.getMessage()));
         return problem(ErrorCode.ACCESS_DENIED, "Caller is not authorised for this operation", request);
     }
 
     @ExceptionHandler(Exception.class)
     public ProblemDetail onUnexpectedException(Exception exception, WebRequest request) {
-        log.error("Unexpected failure on {}", path(request), exception);
+        log.error("Unexpected failure on {}", loggedPath(request), exception);
         return problem(ErrorCode.INTERNAL_ERROR, "Unexpected server failure", request);
     }
 
@@ -90,6 +93,10 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         detail.setProperty("errorCode", code.name());
         detail.setProperty("timestamp", clock.instant().toString());
         return detail;
+    }
+
+    private String loggedPath(WebRequest request) {
+        return LogSanitiser.oneLine(path(request));
     }
 
     private String path(WebRequest request) {

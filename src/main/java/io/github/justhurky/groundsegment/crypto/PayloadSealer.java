@@ -19,6 +19,7 @@ public class PayloadSealer {
     public static final String TRANSFORMATION = "AES/GCM/NoPadding";
     public static final int NONCE_LENGTH_BYTES = 12;
     public static final int TAG_LENGTH_BITS = 128;
+    public static final int MAX_PLAINTEXT_BYTES = 1 << 20;
 
     private final SecretKey key;
     private final SecureRandom random = new SecureRandom();
@@ -33,6 +34,10 @@ public class PayloadSealer {
     }
 
     public byte[] seal(byte[] plaintext, String associatedData) {
+        if (plaintext.length > MAX_PLAINTEXT_BYTES) {
+            throw new IllegalArgumentException("Refusing to seal " + plaintext.length
+                    + " bytes, the limit is " + MAX_PLAINTEXT_BYTES);
+        }
         byte[] nonce = new byte[NONCE_LENGTH_BYTES];
         random.nextBytes(nonce);
         try {

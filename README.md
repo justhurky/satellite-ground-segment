@@ -188,7 +188,7 @@ curl -s localhost:8080/api/v1/audit/integrity -H "Authorization: Bearer $AUDITOR
 ./mvnw verify
 ```
 
-213 tests run in about 50 seconds, covering 93% of instructions and 83% of branches. The build fails
+221 tests run in about 50 seconds, covering 92% of instructions and 84% of branches. The build fails
 below 88% and 78%, so the ratchet cannot quietly slip. The suite is deliberately weighted towards the
 paths that must not break:
 
