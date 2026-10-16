@@ -5,7 +5,7 @@ RUN mvn -B -q dependency:go-offline
 COPY src ./src
 RUN mvn -B -q package -DskipTests
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 RUN addgroup -S groundsegment && adduser -S groundsegment -G groundsegment
 WORKDIR /app
 COPY --from=build /build/target/satellite-ground-segment-1.0.0.jar app.jar
