@@ -3,12 +3,15 @@ updates:
   - package-ecosystem: maven
     directory: "/"
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 3
     groups:
       spring:
         patterns:
           - "org.springframework*"
+        update-types:
+          - minor
+          - patch
       test-libraries:
         patterns:
           - "org.testcontainers:*"
@@ -16,13 +19,30 @@ updates:
           - "org.assertj:*"
           - "org.mockito:*"
           - "com.tngtech.archunit:*"
+      build-plugins:
+        patterns:
+          - "org.jacoco:*"
+          - "org.apache.maven*"
+    ignore:
+      - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: monthly
+    open-pull-requests-limit: 2
 
   - package-ecosystem: docker
     directory: "/"
     schedule:
       interval: monthly
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types:
+          - version-update:semver-major
+      - dependency-name: "maven"
+        update-types:
+          - version-update:semver-major
