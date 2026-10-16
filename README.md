@@ -1,6 +1,7 @@
 # Satellite Ground Segment
 
 [![build](https://github.com/justhurky/satellite-ground-segment/actions/workflows/build.yml/badge.svg)](https://github.com/justhurky/satellite-ground-segment/actions/workflows/build.yml)
+[![codeql](https://github.com/justhurky/satellite-ground-segment/actions/workflows/codeql.yml/badge.svg)](https://github.com/justhurky/satellite-ground-segment/actions/workflows/codeql.yml)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-brightgreen)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -187,8 +188,9 @@ curl -s localhost:8080/api/v1/audit/integrity -H "Authorization: Bearer $AUDITOR
 ./mvnw verify
 ```
 
-188 tests run in about 45 seconds, covering 89% of instructions and 78% of branches. The suite is
-deliberately weighted towards the paths that must not break:
+213 tests run in about 50 seconds, covering 93% of instructions and 83% of branches. The build fails
+below 88% and 78%, so the ratchet cannot quietly slip. The suite is deliberately weighted towards the
+paths that must not break:
 
 | Kind                   | What it covers                                                                     |
 |------------------------|------------------------------------------------------------------------------------|
@@ -197,13 +199,17 @@ deliberately weighted towards the paths that must not break:
 | Replay window          | duplicates, out-of-order inside the window, too-old frames, counter wraparound     |
 | State machines         | the full transition tables of the command lifecycle and the mission phases         |
 | Authorisation          | catalogue, criticality, mission phase, role and clock-skew rules                   |
+| Audit integrity        | tampering with a field, rewriting a link and deleting an entry are all detected     |
+| Uplink scheduling      | no contact, tight budgets, criticality order, deferred and future-dated commands    |
 | Web layer slice        | request validation and error mapping with mocked services (`@WebMvcTest`)          |
 | End-to-end             | the whole mission flow and its failure modes over HTTP (`@SpringBootTest`)         |
 | Schema on PostgreSQL   | Flyway migrations and the JPA mapping on a real database (Testcontainers)          |
 | Demo profile           | the seeded mission, its keys, its contact window and its audit chain               |
 | Architecture           | slice cycles, layering, injection style and immutable payloads (ArchUnit)          |
 
-The PostgreSQL test is skipped when no Docker daemon is available and runs in CI.
+The PostgreSQL test is skipped when no Docker daemon is available and runs in CI. Beyond the test
+suite, every push is analysed by CodeQL with the extended security queries, and Dependabot watches
+the Maven, Actions and Docker dependencies.
 
 ## Layout
 
